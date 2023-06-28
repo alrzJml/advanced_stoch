@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
 
 from src.data import Option
 
@@ -9,7 +10,7 @@ class Bionomial:
 
     @staticmethod
     def price(
-        s0: float, K: float, T: float, r: float, v: float, N: int, call: bool = True
+        S0: float, K: float, T: float, r: float, v: float, N: int, call: bool = True
     ) -> float:
         """Price an option using the binomial pricing model
         Args:
@@ -34,7 +35,7 @@ class Bionomial:
         price_tree = np.zeros([N + 1, N + 1])
         for i in range(N + 1):
             for j in range(i + 1):
-                price_tree[j, i] = s0 * (d**j) * (u ** (i - j))
+                price_tree[j, i] = S0 * (d**j) * (u ** (i - j))
 
         option_tree = np.zeros([N + 1, N + 1])
         if call:
@@ -63,13 +64,206 @@ class Bionomial:
         """
         data["binPrice"] = data.apply(
             lambda x: Bionomial.price(
-                s0=x["S0"],
+                S0=x["S0"],
                 K=option.strike,
                 T=x["T"],
                 r=x["rf"],
                 v=x["std"],
                 N=90,
                 call=option.call,
+            ),
+            axis=1,
+        )
+        return data
+
+
+class Trinomial:
+    """Trinomial pricing model for European options"""
+
+    @staticmethod
+    def price(
+        S0: float, K: float, T: float, r: float, v: float, N: int, call: bool = True
+    ) -> float:
+        dt = T / N  # time step
+        u = np.exp(v * np.sqrt(2 * dt))  # up factor
+        d = 1 / u  # down factor
+        m = 1  # no change
+
+        # Risk-neutral probabilities
+        pu = (
+            (np.exp(r * dt / 2) - np.exp(-v * np.sqrt(dt / 2)))
+            / (np.exp(v * np.sqrt(dt / 2)) - np.exp(-v * np.sqrt(dt / 2)))
+        ) ** 2
+        pd = (
+            (np.exp(v * np.sqrt(dt / 2)) - np.exp(r * dt / 2))
+            / (np.exp(v * np.sqrt(dt / 2)) - np.exp(-v * np.sqrt(dt / 2)))
+        ) ** 2
+        pm = 1 - pu - pd
+
+        # Price tree
+        price_tree = np.zeros([2 * N + 1, N + 1])
+        price_tree[N, 0] = S0
+        for i in range(1, N + 1):
+            price_tree[N - i, i] = u * price_tree[N - i + 1, i - 1]
+            for j in range(N - i + 1, N + i + 1):
+                price_tree[j, i] = d * price_tree[j - 1, i - 1]
+
+        # Option value at each final node
+        if call:
+            option_tree = np.maximum(price_tree - K, 0)
+        else:
+            option_tree = np.maximum(K - price_tree, 0)
+
+        # Calculate option price at t = 0
+        for i in np.arange(N - 1, -1, -1):
+            for j in np.arange(N - i, N + i + 1):
+                option_tree[j, i] = np.exp(-r * dt) * (
+                    pu * option_tree[j - 1, i + 1]
+                    + pm * option_tree[j, i + 1]
+                    + pd * option_tree[j + 1, i + 1]
+                )
+
+        return option_tree[N, 0]
+
+    @staticmethod
+    def add_price(option: Option, data: pd.DataFrame) -> pd.DataFrame:
+        """Add option price to dataframe
+        Args:
+            data (pd.Dataframe): dataframe to add option price to
+        Returns:
+            pd.DataFrame: dataframe with option price
+        """
+        data["triPrice"] = data.apply(
+            lambda x: Trinomial.price(
+                S0=x["S0"],
+                K=option.strike,
+                T=x["T"],
+                r=x["rf"],
+                v=x["std"],
+                N=90,
+                call=option.call,
+            ),
+            axis=1,
+        )
+        return data
+
+
+class BLS:
+    """Black-Scholes pricing model for European options"""
+
+    @staticmethod
+    def price(
+        S0: float, K: float, T: float, r: float, v: float, call: bool = True
+    ) -> float:
+        """Price an option using the Black-Scholes pricing model
+
+        Args:
+            S0 (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+            v (float): annualized volatility
+            call (bool, optional): True for call option, False for put option. Defaults to True.
+
+        Returns:
+            float: option price
+        """
+
+        # Calculate d1 and d2 parameters
+        d1 = (np.log(S0 / K) + (r + 0.5 * v**2) * T) / (v * np.sqrt(T))
+        d2 = d1 - v * np.sqrt(T)
+
+        # Calculate option price
+        if call:
+            price = S0 * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+        else:
+            price = K * np.exp(-r * T) * norm.cdf(-d2) - S0 * norm.cdf(-d1)
+
+        return price
+
+    @staticmethod
+    def add_price(option: Option, data: pd.DataFrame) -> pd.DataFrame:
+        """Add option price to dataframe
+        Args:
+            data (pd.Dataframe): dataframe to add option price to
+        Returns:
+            pd.DataFrame: dataframe with option price
+        """
+        data["blsPrice"] = data.apply(
+            lambda x: BLS.price(
+                S0=x["S0"],
+                K=option.strike,
+                T=x["T"],
+                r=x["rf"],
+                v=x["std"],
+                call=option.call,
+            ),
+            axis=1,
+        )
+        return data
+
+
+class MontCarlo:
+    """Monte Carlo pricing model for European options"""
+
+    @staticmethod
+    def price(
+        S0: float,
+        K: float,
+        T: float,
+        r: float,
+        v: float,
+        N: int,
+        num_simulations: int = 10000,
+    ) -> float:
+        """Price an option using the Monte Carlo pricing model
+
+        Args:
+            S0 (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+            v (float): annualized volatility
+            num_simulations (int, optional): number of simulations. Defaults to 10000.
+
+        Returns:
+            float: option price
+        """
+        dt = T / N
+        # Creating an array to store payoffs
+        payoffs = np.zeros(num_simulations)
+
+        # Simulate price paths
+        for i in range(num_simulations):
+            price_path = S0 * np.cumprod(
+                np.exp(
+                    (r - 0.5 * v**2) * dt
+                    + v * np.sqrt(dt) * np.random.standard_normal(N)
+                )
+            )
+            # Compute the payoff for each path
+            payoffs[i] = max(price_path[-1] - K, 0)
+
+        # Average payoffs and discount back to today
+        return np.exp(-r * T) * np.mean(payoffs)
+
+    @staticmethod
+    def add_price(option: Option, data: pd.DataFrame) -> pd.DataFrame:
+        """Add option price to dataframe
+        Args:
+            data (pd.Dataframe): dataframe to add option price to
+        Returns:
+            pd.DataFrame: dataframe with option price
+        """
+        data["mcPrice"] = data.apply(
+            lambda x: MontCarlo.price(
+                S0=x["S0"],
+                K=option.strike,
+                T=x["T"],
+                r=x["rf"],
+                v=x["std"],
+                N=90,
+                num_simulations=10000,
             ),
             axis=1,
         )

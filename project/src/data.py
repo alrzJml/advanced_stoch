@@ -5,7 +5,8 @@ from collections import namedtuple
 import jdatetime
 
 Option = namedtuple(
-    "Option", ["stock_symbol", "option_symbol", "strike", "maturity_date", "call"]
+    "Option",
+    ["tag", "stock_symbol", "option_symbol", "strike", "maturity_date", "call"],
 )
 
 
