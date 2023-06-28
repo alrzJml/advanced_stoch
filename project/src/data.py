@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import pytse_client as tse
 from collections import namedtuple
+import jdatetime
 
 Option = namedtuple(
     "Option", ["stock_symbol", "option_symbol", "strike", "maturity_date", "call"]
@@ -39,6 +40,14 @@ def fetch_data(option: Option) -> pd.DataFrame:
         suffixes=["Stock", "Option"],
         how="outer",
     )
+
+    data.rename(
+        columns={
+            "adjCloseStock": "S0",
+            "adjCloseOption": "actual_option",
+        },
+        inplace=True,
+    )
     return data
 
 
@@ -57,7 +66,7 @@ def add_std(data: pd.DataFrame, rolling_window: int = 90) -> pd.DataFrame:
         0
     ]
     # Calculate rolling std
-    data["std"] = data["adjCloseStock"].pct_change().rolling(rolling_window).std()
+    data["std"] = data["S0"].pct_change().rolling(rolling_window).std()
     # Annualize std
     data["std"] = data["std"] * np.sqrt(std_period)
 
@@ -80,5 +89,15 @@ def add_rf(data: pd.DataFrame) -> pd.DataFrame:
     # merge dataframes
     data = pd.merge(data, df_rf, on="date", how="left")
     data["rf"] = data["rf"].ffill()
+    data["rf"] = data["rf"] / 100
 
+    return data
+
+
+def add_T(option: Option, data: pd.DataFrame) -> pd.DataFrame:
+    end_date = option.maturity_date
+    if end_date[:2] == "14":
+        yr, mn, dy = end_date.split("-")
+        end_date = jdatetime.date(int(yr), int(mn), int(dy)).togregorian()
+    data["T"] = (pd.to_datetime(end_date) - data["date"]).dt.days / 365
     return data

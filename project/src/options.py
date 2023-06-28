@@ -1,4 +1,7 @@
+import pandas as pd
 import numpy as np
+
+from src.data import Option
 
 
 class Bionomial:
@@ -49,3 +52,25 @@ class Bionomial:
                 )
 
         return option_tree[0, 0]
+
+    @staticmethod
+    def add_price(option: Option, data: pd.DataFrame) -> pd.DataFrame:
+        """Add option price to dataframe
+        Args:
+            data (pd.Dataframe): dataframe to add option price to
+        Returns:
+            pd.DataFrame: dataframe with option price
+        """
+        data["binPrice"] = data.apply(
+            lambda x: Bionomial.price(
+                s0=x["S0"],
+                K=option.strike,
+                T=x["T"],
+                r=x["rf"],
+                v=x["std"],
+                N=90,
+                call=option.call,
+            ),
+            axis=1,
+        )
+        return data
