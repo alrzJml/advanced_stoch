@@ -10,6 +10,31 @@ Option = namedtuple(
 )
 
 
+def fetch_stoch_history(symbol: str, days: int = 365) -> pd.DataFrame:
+    """Fetch historical data for a given stock
+    Args:
+        symbol (str): stock symbol
+        start_date (str): start date
+        end_date (str): end date
+    Returns:
+        pd.DataFrame: historical data
+    """
+    # Fetch historical data
+    stock_data = tse.download(symbols=symbol, write_to_csv=False)[symbol]
+
+    start_date = pd.Timestamp.now() - pd.Timedelta(days=days)
+    # format start_date as 'YYYY-MM-DD'
+    start_date = start_date.strftime("%Y-%m-%d")
+    end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+    # filter stock data by start_date
+    stock_data = stock_data[stock_data["date"] >= start_date]
+    stock_data = stock_data[stock_data["date"] <= end_date]
+    stock_data = stock_data[['date', 'adjClose']]
+    stock_data.rename(columns={'adjClose': 'S0'}, inplace=True)
+
+    return stock_data
+
+
 def fetch_data(option: Option) -> pd.DataFrame:
     """Fetch historical data for a given option along with underlying stock
     Args:
@@ -102,3 +127,8 @@ def add_T(option: Option, data: pd.DataFrame) -> pd.DataFrame:
         end_date = jdatetime.date(int(yr), int(mn), int(dy)).togregorian()
     data["T"] = (pd.to_datetime(end_date) - data["date"]).dt.days / 365
     return data
+
+
+def read_fund_portfolio_options(fund: str):
+    """Read fund portfolio options from excel file"""
+    return pd.read_excel(f"data/{fund}_portfolio.xlsx", sheet_name="option")

@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import jdatetime
+import datetime
 from scipy.stats import norm
 
 from src.data import Option
@@ -40,16 +42,19 @@ class Bionomial:
         option_tree = np.zeros([N + 1, N + 1])
         if call:
             # Option value at each final node is max(S - K, 0)
-            option_tree[:, N] = np.maximum(np.zeros(N + 1), price_tree[:, N] - K)
+            option_tree[:, N] = np.maximum(
+                np.zeros(N + 1), price_tree[:, N] - K)
         else:
             # Option value at each final node is max(K - S, 0)
-            option_tree[:, N] = np.maximum(np.zeros(N + 1), K - price_tree[:, N])
+            option_tree[:, N] = np.maximum(
+                np.zeros(N + 1), K - price_tree[:, N])
 
         # Calculate option price at t = 0
         for i in np.arange(N - 1, -1, -1):
             for j in np.arange(0, i + 1):
                 option_tree[j, i] = np.exp(-r * dt) * (
-                    p * option_tree[j, i + 1] + (1 - p) * option_tree[j + 1, i + 1]
+                    p * option_tree[j, i + 1] +
+                    (1 - p) * option_tree[j + 1, i + 1]
                 )
 
         return option_tree[0, 0]
@@ -268,3 +273,68 @@ class MontCarlo:
             axis=1,
         )
         return data
+
+
+class Strategy:
+
+    @staticmethod
+    def add_greeks(K: float, mat_date: str, is_call: bool, today: str, S0: float, rf: float, sigma: float) -> tuple[float, float, float, float]:
+        """Calculate option greeks
+        Args:
+            option (Option): option to calculate greeks for
+            date (str): date to calculate greeks for
+            S0 (float): initial stock price
+            rf (float): risk-free interest rate
+            sigma (float): annualized volatility
+        Returns:
+            tuple[float, float, float, float]: delta, gamma, vega, theta
+        """
+        end_date = mat_date
+        if end_date[:2] == "14":
+            yr, mn, dy = end_date.split("-")
+            end_date = jdatetime.date(int(yr), int(mn), int(dy)).togregorian()
+        today = datetime.datetime.strptime(
+            today.split(' ')[0], "%Y-%m-%d").date()
+        T = (end_date - today).days / 365
+
+        # Calculate Greeks
+        d1 = (np.log(S0 / K) + (rf + 0.5 * sigma ** 2) * T) / \
+            (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
+
+        # Calculate Delta, Gamma, Vega, Theta, Rho
+        delta = norm.cdf(d1) * (1 if is_call else -1)
+        gamma = norm.pdf(d1) / (S0 * sigma * np.sqrt(T))
+        vega = S0 * norm.pdf(d1) * np.sqrt(T)
+        if is_call:
+            theta = -S0 * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) - \
+                rf * K * np.exp(-rf * T) * norm.cdf(d2)
+        else:
+            theta = -S0 * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) + \
+                rf * K * np.exp(-rf * T) * norm.cdf(-d2)
+
+        rho = K * T * np.exp(-rf * T) * norm.cdf(d2)
+
+        return delta, gamma, vega, theta, rho
+
+    @staticmethod
+    def delta_neutral_strategy(delta, num_shares_owned, contract_size=1000):
+        """
+        This function calculates the number of options to sell to make your portfolio delta neutral.
+        """
+        num_options_to_sell = num_shares_owned / (delta * contract_size)
+        return num_options_to_sell
+
+    def vega_neutral_strategy(vega, num_shares_owned, contract_size=1000):
+        """
+        This function calculates the number of options to sell to make your portfolio vega neutral.
+        """
+        num_options_to_sell = num_shares_owned / (vega * contract_size)
+        return num_options_to_sell
+
+    def theta_neutral_strategy(theta, num_shares_owned, contract_size=1000):
+        """
+        This function calculates the number of options to sell to make your portfolio theta neutral.
+        """
+        num_options_to_sell = num_shares_owned / (theta * contract_size)
+        return num_options_to_sell
