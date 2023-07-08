@@ -1,3 +1,8 @@
+"""Option pricing models"""
+
+from scipy import optimize
+import math
+from scipy.stats import norm
 import pandas as pd
 import numpy as np
 import jdatetime
@@ -338,3 +343,45 @@ class Strategy:
         """
         num_options_to_sell = num_shares_owned / (theta * contract_size)
         return num_options_to_sell
+
+
+class Volatility:
+
+    @staticmethod
+    def black_scholes_model(S, K, T, r, sigma):
+        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / \
+            (sigma * math.sqrt(T))
+        d2 = (math.log(S / K) + (r - 0.5 * sigma ** 2) * T) / \
+            (sigma * math.sqrt(T))
+
+        call = (S * norm.cdf(d1, 0.0, 1.0) - K *
+                math.exp(-r * T) * norm.cdf(d2, 0.0, 1.0))
+        return call
+
+    @staticmethod
+    def vega(S, K, T, r, sigma):
+        d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / \
+            (sigma * math.sqrt(T))
+        vega = S * norm.pdf(d1, 0.0, 1.0) * math.sqrt(T)
+        return vega
+
+    @staticmethod
+    def implied_volatility(S, K, T, r, C0, sigma_est, it=100) -> float:
+        """Calculate implied volatility
+
+        Args:
+            S (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+            C0 (float): option price
+            sigma_est (float): estimated volatility
+
+            Returns:
+                float: implied volatility
+        """
+        for i in range(it):
+            sigma_est -= (
+                Volatility.black_scholes_model(S, K, T, r, sigma_est) - C0
+            ) / Volatility.vega(S, K, T, r, sigma_est)
+        return sigma_est
