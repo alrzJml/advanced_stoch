@@ -132,3 +132,24 @@ def add_T(option: Option, data: pd.DataFrame) -> pd.DataFrame:
 def read_fund_portfolio_options(fund: str):
     """Read fund portfolio options from excel file"""
     return pd.read_excel(f"data/{fund}_portfolio.xlsx", sheet_name="option")
+
+
+def read_bonds() -> pd.DataFrame:
+    """Read bonds data from excel file"""
+
+    df = pd.read_excel('data/bonds.xlsx')
+    df = df[df['YTM'] != 'سررسید شده']
+
+    def add_T(date: str):
+        year, month, day = date.split('-')
+        now = jdatetime.datetime.now().date().togregorian()
+        date = jdatetime.date(int(year), int(month), int(day)).togregorian()
+        return (date - now).days/365
+
+    df['maturity'] = df['تاریخ سررسید'].apply(add_T)
+    df = df[['قیمت پایانی', 'maturity', 'YTM']]
+    df.columns = ['price', 'maturity', 'ytm']
+    df.ytm = df.ytm.str.replace('%', '').str.replace(
+        '/', '.').astype(float)/100
+
+    return df.dropna(subset=['ytm'], axis=0)
