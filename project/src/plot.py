@@ -1,8 +1,18 @@
+"""Plotting functions for the project"""
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
 def plot_methods(results: list[pd.DataFrame], option_tags: list[str]) -> None:
+    """Plot the results of different pricing methods
+
+    Args:
+        results (list[pd.DataFrame]): list of results for each option
+        option_tags (list[str]): list of option tags
+
+    Returns:
+        None
+    """
     methods = ["binPrice", "triPrice", "blsPrice", "mcPrice"]
 
     _, axes = plt.subplots(nrows=5, ncols=4, figsize=(15, 20))
@@ -24,6 +34,15 @@ def plot_methods(results: list[pd.DataFrame], option_tags: list[str]) -> None:
 
 
 def plot_errs(errors: pd.DataFrame, option_tags: list[str]):
+    """Plot the errors for each option
+
+    Args:
+        errors (pd.DataFrame): errors for each option
+        option_tags (list[str]): list of option tags
+
+        Returns:
+            None
+    """
     fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 8))
     for i, option in enumerate(option_tags):
         ax = axes[i // 2, i % 2]  # Determine the correct subplot

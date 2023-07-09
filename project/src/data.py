@@ -1,3 +1,5 @@
+"""Data module"""
+
 import pandas as pd
 import numpy as np
 import pytse_client as tse

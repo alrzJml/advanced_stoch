@@ -94,6 +94,18 @@ class Trinomial:
     def price(
         S0: float, K: float, T: float, r: float, v: float, N: int, call: bool = True
     ) -> float:
+        """Price an option using the trinomial pricing model
+        Args:
+            s0 (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+            v (float): annualized volatility
+            N (int): number of time steps
+            call (bool, optional): True for call option, False for put option. Defaults to True.
+        Returns:
+            float: option price
+        """
         dt = T / N  # time step
         u = np.exp(v * np.sqrt(2 * dt))  # up factor
         d = 1 / u  # down factor
@@ -346,9 +358,21 @@ class Strategy:
 
 
 class Volatility:
+    """Volatility class"""
 
     @staticmethod
     def black_scholes_model(S, K, T, r, sigma):
+        """Black-Scholes model for European options
+
+        Args:
+            S (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+
+        Returns:
+            float: option price
+        """
         d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / \
             (sigma * math.sqrt(T))
         d2 = (math.log(S / K) + (r - 0.5 * sigma ** 2) * T) / \
@@ -360,6 +384,18 @@ class Volatility:
 
     @staticmethod
     def vega(S, K, T, r, sigma):
+        """Calculate vega
+
+        Args:
+            S (float): initial stock price
+            K (float): strike price
+            T (float): time to maturity as a fraction of one year
+            r (float): risk-free interest rate
+            sigma (float): annualized volatility
+
+        Returns:
+            float: vega
+        """
         d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / \
             (sigma * math.sqrt(T))
         vega = S * norm.pdf(d1, 0.0, 1.0) * math.sqrt(T)
