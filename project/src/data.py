@@ -77,11 +77,12 @@ def fetch_data(option: Option) -> pd.DataFrame:
     return data
 
 
-def add_std(data: pd.DataFrame, rolling_window: int = 90) -> pd.DataFrame:
+def add_std(data: pd.DataFrame, rolling_window: int = 90, annualized: bool = True) -> pd.DataFrame:
     """Add rolling standard deviation to dataframe
     Args:
         data (pd.DataFrame): dataframe to add std to
         rolling_window (int, optional): rolling window for std. Defaults to 90.
+        annualized (bool, optional): annualize std. Defaults to True.
     Returns:
         pd.DataFrame: dataframe with std column
     """
@@ -93,8 +94,9 @@ def add_std(data: pd.DataFrame, rolling_window: int = 90) -> pd.DataFrame:
     ]
     # Calculate rolling std
     data["std"] = data["S0"].pct_change().rolling(rolling_window).std()
-    # Annualize std
-    data["std"] = data["std"] * np.sqrt(std_period)
+    # annualize std
+    if annualized:
+        data["std"] = data["std"] * np.sqrt(std_period)
 
     return data
 
